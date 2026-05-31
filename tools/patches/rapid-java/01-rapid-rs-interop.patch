@@ -1,0 +1,278 @@
+diff --git a/examples/src/main/java/com/vrg/standalone/StandaloneAgent.java b/examples/src/main/java/com/vrg/standalone/StandaloneAgent.java
+index 85168a5..b8afae5 100644
+--- a/examples/src/main/java/com/vrg/standalone/StandaloneAgent.java
++++ b/examples/src/main/java/com/vrg/standalone/StandaloneAgent.java
+@@ -32,8 +32,11 @@ import java.io.IOException;
+  */
+ public class StandaloneAgent {
+     private static final Logger LOG = LoggerFactory.getLogger(StandaloneAgent.class);
+-    private static final int SLEEP_INTERVAL_MS = 1000;
+-    private static final int MAX_TRIES = 400;
++    // rapid-rs interop: tighter print cadence so the shell harness can
++    // sample a converged view promptly. The default Rust agent's
++    // `--print-view-every` is 1000ms; we mirror that.
++    private static final int SLEEP_INTERVAL_MS = 500;
++    private static final int MAX_TRIES = 1200;
+     final HostAndPort listenAddress;
+     final HostAndPort seedAddress;
+     @Nullable private Cluster cluster = null;
+@@ -87,6 +90,18 @@ public class StandaloneAgent {
+      */
+     private void printClusterMembership() {
+         LOG.info("Node {} -- cluster size {}", listenAddress, cluster.getMembershipSize());
++        // rapid-rs interop: machine-readable `view:` line used by
++        // crates/rapid-compat-tests/interop/mixed_cluster.sh. The leading
++        // hex token is a placeholder; the shell harness compares only the
++        // bracketed memberlist (two agents agreeing on memberlist agree on
++        // configuration id by construction).
++        final java.util.List<com.vrg.rapid.pb.Endpoint> memberlist = cluster.getMemberlist();
++        final java.util.List<String> sorted = new java.util.ArrayList<>();
++        for (final com.vrg.rapid.pb.Endpoint e : memberlist) {
++            sorted.add(e.getHostname().toStringUtf8() + ":" + e.getPort());
++        }
++        java.util.Collections.sort(sorted);
++        System.out.println("view: 0 [" + String.join(",", sorted) + "]");
+     }
+ 
+     public static void main(final String[] args) throws ParseException {
+diff --git a/pom.xml b/pom.xml
+index 4bf73f0..8619fb2 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -56,110 +56,20 @@
+ 
+     <build>
+         <plugins>
+-            <!-- Error-prone -->
++            <!-- rapid-rs interop: the upstream pom pinned Java 8 +
++                 errorprone/findbugs/checkstyle plugins that are incompatible
++                 with modern JDKs. For interop builds we replace the
++                 errorprone-bound compiler with a plain maven-compiler-plugin
++                 and drop the static-analysis plugins entirely. -->
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-compiler-plugin</artifactId>
+-                <version>3.3</version>
++                <version>3.11.0</version>
+                 <configuration>
+-                    <compilerId>javac-with-errorprone</compilerId>
+-                    <forceJavacCompilerUse>true</forceJavacCompilerUse>
+-                    <!-- maven-compiler-plugin defaults to targeting Java 5, but our javac
+-                         only supports >=6 -->
+-                    <source>8</source>
+-                    <target>8</target>
++                    <source>11</source>
++                    <target>11</target>
+                     <showWarnings>true</showWarnings>
+-                    <!-- Protobuf/grpc generated sources triggers too many warnings -->
+-                    <compilerArgs>
+-                        <arg>-XepDisableWarningsInGeneratedCode</arg>
+-                        <arg>-Werror</arg>
+-                    </compilerArgs>
+                 </configuration>
+-                <dependencies>
+-                    <dependency>
+-                        <groupId>org.codehaus.plexus</groupId>
+-                        <artifactId>plexus-compiler-javac-errorprone</artifactId>
+-                        <version>2.8</version>
+-                    </dependency>
+-                    <!-- override plexus-compiler-javac-errorprone's dependency on
+-                         Error Prone with the latest version -->
+-                    <dependency>
+-                        <groupId>com.google.errorprone</groupId>
+-                        <artifactId>error_prone_core</artifactId>
+-                        <version>2.0.21</version>
+-                    </dependency>
+-                </dependencies>
+-            </plugin>
+-            <!-- Findbugs -->
+-            <plugin>
+-                <groupId>org.codehaus.mojo</groupId>
+-                <artifactId>findbugs-maven-plugin</artifactId>
+-                <version>3.0.4</version>
+-                <dependencies>
+-                    <dependency>
+-                        <groupId>com.github.lalithsuresh</groupId>
+-                        <artifactId>build-common</artifactId>
+-                        <version>1.0</version>
+-                    </dependency>
+-                </dependencies>
+-                <configuration>
+-                    <!--
+-                        Enables analysis which takes more memory but finds more bugs.
+-                        If you run out of memory, changes the value of the effort element
+-                        to 'Low'.
+-                    -->
+-                    <effort>Max</effort>
+-                    <!-- Reports all bugs (other values are medium and max) -->
+-                    <threshold>Low</threshold>
+-                    <!-- Produces XML report -->
+-                    <xmlOutput>true</xmlOutput>
+-                    <!-- Configures the directory in which the XML report is created -->
+-                    <excludeFilterFile>findbugs-exclude.xml</excludeFilterFile>
+-                    <findbugsXmlOutputDirectory>${project.build.directory}/findbugs</findbugsXmlOutputDirectory>
+-                    <includeTests>true</includeTests>
+-                </configuration>
+-                <executions>
+-                    <!--
+-                        Ensures that FindBugs inspects source code when project is compiled.
+-                    -->
+-                    <execution>
+-                        <id>analyze-compile</id>
+-                        <phase>compile</phase>
+-                        <goals>
+-                            <goal>check</goal>
+-                        </goals>
+-                    </execution>
+-                </executions>
+-            </plugin>
+-            <!-- Coding style checks -->
+-            <plugin>
+-                <groupId>org.apache.maven.plugins</groupId>
+-                <artifactId>maven-checkstyle-plugin</artifactId>
+-                <version>2.17</version>
+-                <dependencies>
+-                    <dependency>
+-                        <groupId>com.github.lalithsuresh</groupId>
+-                        <artifactId>build-common</artifactId>
+-                        <version>1.0</version>
+-                    </dependency>
+-                </dependencies>
+-                <configuration>
+-                    <configLocation>checkstyle.xml</configLocation>
+-                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+-                    <suppressionsLocation>suppressions.xml</suppressionsLocation>
+-                </configuration>
+-                <executions>
+-                    <execution>
+-                        <id>checkstyle</id>
+-                        <phase>validate</phase>
+-                        <goals>
+-                            <goal>check</goal>
+-                        </goals>
+-                        <configuration>
+-                            <failOnViolation>true</failOnViolation>
+-                        </configuration>
+-                    </execution>
+-                </executions>
+             </plugin>
+             <!-- Code coverage: Jacoco -->
+             <plugin>
+diff --git a/rapid/pom.xml b/rapid/pom.xml
+index 7bce713..ffb0246 100644
+--- a/rapid/pom.xml
++++ b/rapid/pom.xml
+@@ -45,6 +45,15 @@
+         </plugins>
+     </reporting>
+     <dependencies>
++        <!-- rapid-rs interop: javax.annotation.Generated was removed from
++             the JDK in Java 11. The vendored protoc generator emits an
++             import for it; we provide the standalone API jar so the
++             generated sources compile. -->
++        <dependency>
++            <groupId>javax.annotation</groupId>
++            <artifactId>javax.annotation-api</artifactId>
++            <version>1.3.2</version>
++        </dependency>
+         <dependency>
+             <groupId>junit</groupId>
+             <artifactId>junit</artifactId>
+diff --git a/rapid/src/main/java/com/vrg/rapid/messaging/impl/GrpcServer.java b/rapid/src/main/java/com/vrg/rapid/messaging/impl/GrpcServer.java
+index aec595a..d33ae35 100644
+--- a/rapid/src/main/java/com/vrg/rapid/messaging/impl/GrpcServer.java
++++ b/rapid/src/main/java/com/vrg/rapid/messaging/impl/GrpcServer.java
+@@ -76,6 +76,16 @@ public class GrpcServer extends MembershipServiceGrpc.MembershipServiceImplBase
+     @Override
+     public void sendRequest(final RapidRequest rapidRequest,
+                             final StreamObserver<RapidResponse> responseObserver) {
++        // rapid-rs interop: NDJSON wire-trace capture. When the env var
++        // RAPID_NDJSON_TRACE is set to a writable path, every received
++        // RapidRequest is appended as a single JSON line for offline
++        // replay. Each record is:
++        //   {"ts_ms": <epoch ms>,
++        //    "dst":   "host:port",          // this server's listen address
++        //    "req_b64": "<protobuf bytes>"} // base64 of RapidRequest
++        // Src is recoverable from the proto sender field for messages
++        // that carry one. No-op on any IO error.
++        NdjsonTraceWriter.write(address, rapidRequest);
+         if (membershipService != null) {
+             final ListenableFuture<RapidResponse> result = membershipService.handleMessage(rapidRequest);
+             Futures.addCallback(result, new ResponseCallback(responseObserver), grpcExecutor);
+diff --git a/rapid/src/main/java/com/vrg/rapid/messaging/impl/NdjsonTraceWriter.java b/rapid/src/main/java/com/vrg/rapid/messaging/impl/NdjsonTraceWriter.java
+new file mode 100644
+index 0000000..526a385
+--- /dev/null
++++ b/rapid/src/main/java/com/vrg/rapid/messaging/impl/NdjsonTraceWriter.java
+@@ -0,0 +1,71 @@
++/*
++ * rapid-rs interop helper — appends one NDJSON record per received
++ * RapidRequest to the file named by env var RAPID_NDJSON_TRACE.
++ *
++ * Schema: {"ts_ms": <long>, "dst": "host:port", "req_b64": "<base64>"}
++ *
++ * Best-effort: any IO error silently disables further writes.
++ */
++package com.vrg.rapid.messaging.impl;
++
++import com.vrg.rapid.pb.Endpoint;
++import com.vrg.rapid.pb.RapidRequest;
++
++import java.io.BufferedWriter;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++import java.nio.file.StandardOpenOption;
++import java.util.Base64;
++import java.util.concurrent.atomic.AtomicBoolean;
++
++final class NdjsonTraceWriter {
++    private static final AtomicBoolean disabled = new AtomicBoolean(false);
++    private static final Path path = resolvePath();
++    private static final Object lock = new Object();
++    private static BufferedWriter writer;
++
++    private NdjsonTraceWriter() {
++    }
++
++    private static Path resolvePath() {
++        final String env = System.getenv("RAPID_NDJSON_TRACE");
++        if (env == null || env.isEmpty()) {
++            disabled.set(true);
++            return null;
++        }
++        return Paths.get(env);
++    }
++
++    static void write(final Endpoint address, final RapidRequest request) {
++        if (disabled.get()) {
++            return;
++        }
++        try {
++            synchronized (lock) {
++                if (writer == null) {
++                    writer = Files.newBufferedWriter(
++                            path,
++                            StandardCharsets.UTF_8,
++                            StandardOpenOption.CREATE,
++                            StandardOpenOption.APPEND,
++                            StandardOpenOption.WRITE);
++                }
++                final String dst = address.getHostname().toStringUtf8() + ":" + address.getPort();
++                final String b64 = Base64.getEncoder().encodeToString(request.toByteArray());
++                writer.write("{\"ts_ms\":");
++                writer.write(Long.toString(System.currentTimeMillis()));
++                writer.write(",\"dst\":\"");
++                writer.write(dst);
++                writer.write("\",\"req_b64\":\"");
++                writer.write(b64);
++                writer.write("\"}\n");
++                writer.flush();
++            }
++        } catch (final IOException e) {
++            disabled.set(true);
++        }
++    }
++}

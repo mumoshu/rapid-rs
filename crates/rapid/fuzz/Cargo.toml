@@ -1,0 +1,25 @@
+[package]
+name = "rapid-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Detached from the parent workspace — `cargo fuzz` requires nightly
+# and its own resolved lock; keeping it out keeps stable workspace
+# builds from pulling in `libfuzzer-sys`'s native dependency.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+prost = "0.13"
+rapid = { path = ".." }
+
+[[bin]]
+name = "rapid_request_decode"
+path = "fuzz_targets/rapid_request_decode.rs"
+test = false
+doc = false
+bench = false

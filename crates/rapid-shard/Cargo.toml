@@ -1,0 +1,17 @@
+[package]
+name = "rapid-shard"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Pattern-B sharded service discovery on top of a Rapid cluster: each node tags itself with shard ids via cluster metadata; the directory wrapper subscribes to VIEW_CHANGE and maintains a strongly consistent per-shard index."
+
+[dependencies]
+rapid = { path = "../rapid" }
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "macros"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

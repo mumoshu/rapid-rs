@@ -1,0 +1,16 @@
+/temp
+/references
+/target
+# Detached workspaces (loom tests, cargo-fuzz) keep their own target
+# directories — gitignore them by glob.
+/target-loom
+crates/*/target
+crates/*/fuzz/target
+# cargo-fuzz runtime output (auto-grown corpus + crash artifacts).
+crates/*/fuzz/artifacts
+crates/*/fuzz/corpus
+# dhat-rs heap snapshots — produced wherever the soak binary is run.
+**/dhat-heap.json
+# Compiled vector-dump tooling shouldn't enter git.
+/tools/dump-vectors/*.class
+

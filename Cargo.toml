@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rapid",
+    "crates/rapid-example",
+    "crates/rapid-compat-tests",
+    "crates/rapid-shard",
+    "crates/rapid-soak",
+    "xtask",
+]
+exclude = [
+    # Detached workspaces — driven separately:
+    #   crates/rapid-loom-tests : needs RUSTFLAGS="--cfg loom"
+    #   crates/rapid/fuzz       : needs cargo-fuzz nightly toolchain
+    "crates/rapid-loom-tests",
+    "crates/rapid/fuzz",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.95"
+license = "Apache-2.0"
+repository = "https://github.com/mumoshu/rapid-rs"
+
+[workspace.dependencies]
+async-trait = "0.1"
+bytes = "1"
+parking_lot = "0.12"
+prost = "0.13"
+prost-build = "0.13"
+prost-types = "0.13"
+rand = "0.8"
+thiserror = "1"
+tokio = { version = "1", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
+tonic = "0.12"
+tonic-build = "0.12"
+tracing = "0.1"
+uuid = { version = "1", default-features = false, features = ["v4"] }
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+
+[profile.release]
+debug = 1
+lto = "thin"

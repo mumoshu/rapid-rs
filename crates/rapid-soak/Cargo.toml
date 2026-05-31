@@ -1,0 +1,21 @@
+[package]
+name = "rapid-soak"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rapid = { path = "../rapid" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "signal"] }
+clap = { version = "4", features = ["derive"] }
+dhat = "0.3"
+
+[features]
+default = []
+# Enable to switch from the system allocator to dhat's heap profiler.
+dhat-heap = []
+
+[[bin]]
+name = "rapid-soak"
+path = "src/main.rs"

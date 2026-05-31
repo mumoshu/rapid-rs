@@ -1,0 +1,21 @@
+[package]
+name = "rapid-compat-tests"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+rapid = { path = "../rapid" }
+prost = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rapid = { path = "../rapid" }
+prost = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "net"] }
+xxhash-rust = { workspace = true }
+
+[features]
+interop = []

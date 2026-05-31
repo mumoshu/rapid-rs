@@ -1,0 +1,22 @@
+[package]
+name = "rapid-loom-tests"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Detached workspace: `loom` requires `RUSTFLAGS=--cfg loom`, which
+# breaks larger workspace crates (hyper-util has cfg(loom)-gated
+# imports that don't compile in non-isolated builds). Running this
+# crate from a sibling workspace keeps the flag scoped.
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+loom = "0.7"
+
+# Rust 1.80 added --check-cfg. Declare `loom` as a known cfg name so
+# `RUSTFLAGS=--cfg loom` does not trigger an `unexpected_cfgs` warning.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }

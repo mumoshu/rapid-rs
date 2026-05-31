@@ -1,0 +1,9 @@
+FROM debian:bookworm-slim
+
+# The rapid-example binary is built outside the container via
+# `cargo build --release -p rapid-example` and copied in by the
+# docker-compose context.
+COPY rapid-example /usr/local/bin/rapid-example
+RUN chmod +x /usr/local/bin/rapid-example
+
+ENTRYPOINT ["/usr/local/bin/rapid-example"]

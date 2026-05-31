@@ -1,0 +1,103 @@
+# docker-compose interop harness (F3 gate).
+#
+# Brings up 3 Java + 3 Rust agents using `network_mode: host` — each
+# agent binds a unique 127.0.0.1 port. A 7th container (`verifier`)
+# tails every agent's stdout via `docker logs` (mounting the host's
+# docker socket) and asserts they all report the same memberlist for
+# >= 5 consecutive 1-second samples.
+#
+# Pre-requisites:
+#   - References vendored Java jar copied to ./standalone-agent.jar:
+#       cp ../../../../references/rapid-java/examples/target/standalone-agent.jar .
+#   - Release Rust binary copied to ./rapid-example:
+#       cp ../../../../target/release/rapid-example .
+#
+# Usage:
+#   docker compose up --build --abort-on-container-exit \
+#     --exit-code-from verifier
+#
+# Returns the verifier's exit code (0 on PASS).
+#
+# Note: `restart: on-failure` on every joiner. The Java seed needs a
+# few seconds to bind its gRPC server after the container starts;
+# joiners that race ahead will exit non-zero on the first attempt and
+# be re-started until the seed is reachable.
+
+services:
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.java
+    network_mode: host
+    command: ["-l", "127.0.0.1:21234", "-s", "127.0.0.1:21234"]
+    stop_grace_period: 5s
+
+  j1:
+    build:
+      context: .
+      dockerfile: Dockerfile.java
+    network_mode: host
+    command: ["-l", "127.0.0.1:21235", "-s", "127.0.0.1:21234"]
+    depends_on:
+      - seed
+    restart: on-failure
+    stop_grace_period: 5s
+
+  j2:
+    build:
+      context: .
+      dockerfile: Dockerfile.java
+    network_mode: host
+    command: ["-l", "127.0.0.1:21236", "-s", "127.0.0.1:21234"]
+    depends_on:
+      - seed
+    restart: on-failure
+    stop_grace_period: 5s
+
+  r1:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+    network_mode: host
+    command: ["-l", "127.0.0.1:21237", "-s", "127.0.0.1:21234", "--print-view-every", "500"]
+    depends_on:
+      - seed
+    restart: on-failure
+    stop_grace_period: 5s
+
+  r2:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+    network_mode: host
+    command: ["-l", "127.0.0.1:21238", "-s", "127.0.0.1:21234", "--print-view-every", "500"]
+    depends_on:
+      - seed
+    restart: on-failure
+    stop_grace_period: 5s
+
+  r3:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+    network_mode: host
+    command: ["-l", "127.0.0.1:21239", "-s", "127.0.0.1:21234", "--print-view-every", "500"]
+    depends_on:
+      - seed
+    restart: on-failure
+    stop_grace_period: 5s
+
+  verifier:
+    image: docker:27
+    network_mode: host
+    depends_on:
+      - seed
+      - j1
+      - j2
+      - r1
+      - r2
+      - r3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./verify_cluster.sh:/verify_cluster.sh:ro
+    entrypoint: ["sh", "/verify_cluster.sh"]

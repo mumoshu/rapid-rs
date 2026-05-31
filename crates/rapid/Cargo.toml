@@ -1,0 +1,32 @@
+[package]
+name = "rapid"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Rust implementation of the Rapid distributed membership protocol (Suresh et al., USENIX ATC '18)."
+
+[dependencies]
+async-trait = { workspace = true }
+bytes = { workspace = true }
+futures-util = "0.3"
+parking_lot = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net"] }
+tokio-stream = { workspace = true, features = ["net"] }
+tonic = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[build-dependencies]
+prost-build = { workspace = true }
+tonic-build = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "test-util"] }
+proptest = "1"
